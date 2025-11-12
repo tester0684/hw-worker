@@ -6,11 +6,17 @@ interface Env {
     BUCKET_HW: R2Bucket;
 }
 
-// Variables globales
+// Variables globales (Asegúrate de que este ID de cuenta sea el correcto)
 const CLOUDFLARE_ACCOUNT_ID = "bd5ed32b0fb79bff9258f69dcf4e6476";
 const R2_ENDPOINT_URL = `https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 const BUCKET_NAME = "hw-img-th";
-const ITEMS_PER_PAGE = 50; // Constante para la paginación
+const ITEMS_PER_PAGE = 50; 
+const DEFAULT_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*", // Permite acceso desde cualquier origen (para pruebas)
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+};
 
 // =========================================================
 // LÓGICA DE PROCESAMIENTO Y CONSULTAS
@@ -50,13 +56,14 @@ async function getPaginatedCars(env: Env, url: URL): Promise<Response> {
     // 2. CONSTRUIR CLÁUSULAS WHERE Y BINDINGS
     let whereClause = '';
     let bindings: (string | number)[] = [];
+    const searchFields = ['modelo', 'serie', 'tipo', 'marca', 'categoria'];
 
     if (searchTerm) {
-        whereClause = `
-            WHERE modelo LIKE ? OR serie LIKE ? OR tipo LIKE ? OR marca LIKE ? OR categoria LIKE ?
-        `;
-        // Los 'bindings' deben coincidir con el número de ? en la consulta
-        bindings.push(wildCardSearch, wildCardSearch, wildCardSearch, wildCardSearch, wildCardSearch);
+        // Genera la cláusula WHERE: WHERE modelo LIKE ? OR serie LIKE ? ...
+        whereClause = `WHERE ${searchFields.map(field => `${field} LIKE ?`).join(' OR ')}`;
+        
+        // Añade el término de búsqueda para cada campo en el binding
+        searchFields.forEach(() => bindings.push(wildCardSearch));
     }
     
     // --- CONSULTA PRINCIPAL (DATOS) ---
@@ -90,12 +97,7 @@ async function getPaginatedCars(env: Env, url: URL): Promise<Response> {
         totalItems: totalCount,
         totalPages: Math.ceil(totalCount / ITEMS_PER_PAGE)
     }), {
-        headers: {
-            "content-type": "application/json",
-            "Access-Control-Allow-Origin": "*", // Abrimos CORS temporalmente para pruebas
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-        },
+        headers: DEFAULT_CORS_HEADERS,
     });
 }
 
@@ -110,12 +112,7 @@ export default {
 
         // Manejo de solicitudes OPTIONS (CORS Preflight)
         if (request.method === "OPTIONS") {
-            const headers = {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-            };
-            return new Response(null, { status: 204, headers });
+            return new Response(null, { status: 204, headers: DEFAULT_CORS_HEADERS });
         }
         
         try {
@@ -124,17 +121,14 @@ export default {
                 return await getPaginatedCars(env, url);
             }
             
-            // 2. Ruta de Detalle por ID (si la necesitas)
-            // ... (Lógica para /modelo/{ID}) ...
-
             // Respuesta por defecto
             return new Response(JSON.stringify({ 
                 message: "Bienvenido a HotWheels API. Usa /list?page=1&query=..." 
-            }), { status: 200, headers: { 'content-type': 'application/json' } });
+            }), { headers: DEFAULT_CORS_HEADERS, status: 200 });
             
         } catch (e) {
             console.error(e);
-            return new Response(`Error 500: Fallo interno del Worker.`, { status: 500 });
+            return new Response(JSON.stringify({ error: `Error 500: Fallo interno del Worker. ${e}` }), { headers: DEFAULT_CORS_HEADERS, status: 500 });
         }
     }
 } satisfies ExportedHandler<Env>;
