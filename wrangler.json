@@ -1,0 +1,16 @@
+{
+  "compatibility_date": "2025-10-08",
+  "main": "src/index.ts",
+  "name": "hw-worker",
+  "upload_source_maps": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "5282aa3f-3613-4b7e-9b1b-22ba0cf6e91f",
+      "database_name": "hw_database"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
